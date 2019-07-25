@@ -1,0 +1,563 @@
+//过于粗糙，谨慎使用！
+//运行环境VC6.0
+#include <graphics.h>      // 就是需要引用这个图形库
+#include <conio.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#pragma comment( lib, "winmm.lib")
+#define ROWS 25  //游戏区域的大小
+#define COLS 30
+int map[ROWS][COLS];
+#define X 0
+#define Y 80
+int gamespeed;
+
+typedef struct SNAKE
+{
+	int left;
+	int right;
+	int top;
+	int bottom;
+	struct SNAKE *next;
+}snake;
+snake *head,*tail;
+#define UP  1
+#define DOWN   2
+#define LEFT   3
+#define RIGHT  4
+int direction= RIGHT;
+snake *food;
+snake *worm;
+bool IsExistFood=false;
+int score=0;
+
+int endgamestatus=0;
+typedef struct RANKING
+{
+	char name [5];
+	int sco;
+	struct GRANKING *next;
+}ranking;
+
+ranking rank[11];
+
+
+void initsnake()
+{
+	head=(snake*)malloc(sizeof(snake));//建立蛇头
+	snake *p;//蛇遍历指针
+	int startRow=10,startCol=5;//蛇的初始位置
+	head->left=startCol*20;
+	head->top=startRow*20;
+	head->right=(startCol+1)*20;
+	head->bottom=(startRow+1)*20;
+	p=head;
+	for(int i=0;i<3;i++)
+	{
+		tail=(snake*)malloc(sizeof(snake));
+		tail->left=startCol*20;
+		tail->top=(startRow+i+1)*20;
+		tail->right=(startCol+1)*20;
+		tail->bottom=(startRow+i+2)*20;
+		p->next=tail;
+		tail->next=NULL;
+		p=tail;
+	}
+	p=head;
+	while(p!=NULL)
+	{
+		setfillcolor(RED);
+		fillrectangle(p->left,p->top,p->right,p->bottom);
+		if(p==head)//如果是蛇头，画个圆当眼睛。
+		{
+			int x=(p->left+p->right)/2;
+			int y=(p->top+p->bottom)/2;
+			setfillcolor(YELLOW);
+			fillcircle(x,y,2);
+		}
+		p=p->next;
+	}
+}
+
+
+void InitMap()
+{
+	setbkcolor(GREEN);//背景设置为绿色。setbkcolor是#include <graphics.h>  里面的函数。
+	cleardevice();//在屏幕中央输出字符串。
+	RECT r={0, 0, 600, 100};
+	drawtext(_T("SWPU疯狂贪吃蛇"), &r , DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+	//DT_CENTER：使正文在矩形中水平居中.DT_VCENTER：使正文在矩形中垂直居中。DT_SINGLELINE：显示正文的同一行，回车和换行符都不能折行。
+    int i,j;
+    for(i=0;i<ROWS;i++)//会根据数组显示出一个个正方形。row行的意思，col是列的意思。
+    for(j=0;j<COLS;j++)
+	{
+	if(i==0||i==(ROWS-1)||j==0||j==(COLS-1))
+		map[i][j]=1;
+	else
+		map[i][j]=0;
+	}           //绘制的图形。
+	IMAGE imgtop,imgleft,imgright,imgbottom;
+	loadimage(&imgtop,"C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\grasstop.jpg");
+	loadimage(&imgleft,"C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\grassleft.jpg");
+	loadimage(&imgright,"C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\grassright.jpg");
+	loadimage(&imgbottom,"C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\grassbottom.jpg");
+    int left=0,top=80,right=20,bottom=100;
+    for( i=0;i<ROWS;i++)//遍历二维数组。
+	{
+		left=0,right=20;
+		for(j=0;j<COLS;j++)
+		{
+		if(map[i][j]==1&&i==0)
+		{
+			putimage(left,top,&imgtop);
+		}
+		if(map[i][j]==1&&i==(ROWS-1))
+		{
+			putimage(left,top,&imgbottom);
+		}
+		if(map[i][j]==1&&j==0)
+		{
+			putimage(left,top,&imgleft);
+		}
+		if(map[i][j]==1&&j==(COLS-1))
+		{
+			putimage(left,top,&imgright);
+		}
+		if(map[i][j]==0)
+		{
+			setfillcolor(GREEN);
+			fillrectangle(left,top,right,bottom);
+		}
+		left+=20;right+=20;
+	}
+		top+=20;
+	bottom+=20;
+	}
+}
+
+void ranking1()
+
+{
+	FILE *fp;
+	int i=0;
+	int cc;
+	char vv[5];
+	
+	//以读的形式将排名读入rank前10个结构体中
+	if((fp=fopen("f:\\rinking.txt","r"))==NULL)
+	{
+		printf("error!");
+		exit(0);
+	}	
+	for(i=0;i<10;i++)
+	{
+		fscanf(fp,"%5s%5d",&rank[i].name,&rank[i].sco);
+	}
+	
+	//如果sco大于任意rank中的sco，则打破记录，要求输入名字
+	//将输入的名字与分数存入第11个rank结构体。
+	for(i=9;i>=0;i--)
+	{
+		if(score>rank[i].sco)
+		{
+			
+			char b[]="恭喜您打破了记录！请输入您的名字!";
+			outtextxy(180,280,b);
+			char c[]="(输入完成请按enter键)!";
+			outtextxy(220,300,c);
+			
+			scanf("%s",&rank[10].name);
+			rank[10].sco=score;
+			break;
+		}
+	}
+	//将rank按照sco进行排序，并且交换名字。
+	for(i=9;i>=0;i--)
+	{
+		if(rank[i+1].sco>rank[i].sco)
+		{
+			cc=rank[i].sco;
+			rank[i].sco=rank[i+1].sco;
+			rank[i+1].sco=cc;
+			
+			strcpy(vv, rank[i].name);
+			strcpy(rank[i].name,rank[i+1].name);
+			strcpy(rank[i+1].name,vv);
+		}
+	}
+	
+	//已写的形式打开txt，输入前十个rank数据进入文档
+	if((fp=fopen("f:\\rinking.txt","w"))==NULL)
+	{
+		printf("error!");
+		exit(0);
+	}
+	for(i=0;i<10;i++)
+	{
+		fprintf(fp,"%5s%5d",rank[i].name,rank[i].sco);
+	}
+	
+}
+
+void movesnake()
+{
+    int left,top,right,bottom;
+	gamespeed=100-20*(score/3);
+	
+    int newleft,newtop,newright,newbottom;
+    snake *p;//蛇遍历指针
+    setcolor(WHITE);
+    setfillcolor(GREEN);
+    fillrectangle(tail->left,tail->top,tail->right,tail->bottom);//擦除蛇尾。
+    p=head;//从头到尾，输出蛇身新位置。
+        while(p!=NULL)
+        {
+            Sleep(gamespeed);//SLEEP是一种函数，作用是延时，程序暂停若干时间
+            if(p==head)//如果是蛇头，移动到新位置
+            {
+                newleft=p->left;newtop=p->top;newright=p->right;newbottom=p->bottom;//保存蛇头原始坐标
+                if(direction==RIGHT){ p->left+=20;p->right+=20;}//向右的下一个位置
+                if(direction==LEFT){ p->left-=20;p->right-=20;}//向左的下一个位置
+                if(direction==UP){ p->top-=20;p->bottom-=20;}//向上的下一个位置
+                if(direction==DOWN){ p->top+=20;p->bottom+=20;}//向下的下一个位置
+                    
+            }
+            else//其他节点使用上一个节点的位置
+            {
+                left=p->left;top=p->top;right=p->right;bottom=p->bottom;//保存当前蛇身体坐标
+                p->left=newleft;p->right=newright;p->top=newtop;p->bottom=newbottom;//将蛇身体当前节坐标变换成蛇的上一节坐标
+                newleft=left;newright=right;newtop=top;newbottom=bottom;
+            }
+            setcolor(WHITE);setfillcolor(RED);//绘制蛇的当前节
+            fillrectangle(p->left,p->top,p->right,p->bottom);
+            if(p==head)//如果是蛇头，画个圆当眼睛。
+            {
+                fillrectangle(newleft,newtop,newright,newbottom);//擦除原来的蛇头
+                int x=(p->left+p->right)/2;
+                int y=(p->top+p->bottom)/2;
+                setfillcolor(YELLOW);
+                fillcircle(x,y,2);
+            }
+            p=p->next;
+                    
+        }
+    }
+
+void createfood()
+{
+	snake *p;
+	srand((unsigned)time(NULL));//时间作为随机种子
+	food=(snake*)malloc(sizeof(snake));//为食物分配空间
+	int row=rand()%ROWS;//产生食物的所在行列
+	int col=rand()%COLS;
+	if(row==0)row=1;if(row==(ROWS-1))row=ROWS-2;
+	if(col==0)col=1;if(col==(COLS-1))col=COLS-2;
+	food->left=col*20;food->right=food->left+20;//将行列转为实践坐标
+	food->top=row*20+80;food->bottom=food->top+20;
+	worm=(snake*)malloc(sizeof(snake));
+			while(worm==NULL)
+			{
+				worm=(snake*)malloc(sizeof(snake));
+			}
+	int row1=rand()%ROWS;int col1=rand()%COLS;
+	if(row1==0)row1=1;if(row1==(ROWS-1))row1=ROWS-2;
+	if(col1==0)col1=1;if(col1==(COLS-1))row1=COLS-2;
+	worm->left=col1*20;worm->right=worm->left+20;
+	worm->top=row1*20+80;worm->bottom=worm->top+20;
+
+	p=head;//遍历蛇，判断与食物是否重合
+	bool ISSame=false;//蛇身是否与食物重合布尔型变量的值只有 真（true）和假（false），可用于逻辑表达式，也就是“或”“与”“非”之类的逻辑运算和大于小于之类的关系运算，逻辑表达式运算结果为真或为假。
+	while(p!=NULL)
+	{
+		if(p->left==food->left && p->top==food->top&&p->right==food->right&&p->bottom==food->bottom)
+		{
+			ISSame=true;
+			free(food);
+			createfood();
+		}  
+		p=p->next;
+	}
+
+	if(!ISSame)
+	{
+		IMAGE imgfood,imgworm;//输出苹果图片
+		loadimage(&imgfood,"C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\apple.jpg");
+		loadimage(&imgworm,"C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\bug.jpg");
+		putimage(food->left+1,food->top+1,&imgfood);
+		putimage(worm->left+1,worm->top+1,&imgworm);
+		IsExistFood=true;//当前存在食物
+	}
+	
+			
+
+}
+
+
+void eatefood()
+{
+	snake *p;p=head;
+	bool IsEated=false;//是否吃到苹果
+	if(head->left+20==food->left&&head->top==food->top&&head->right+20==food->right&&head->bottom==food->bottom&&direction==4)//蛇向右吃食物
+	{
+		food->next=head;
+		head=food;
+		IsEated=true;
+		IsExistFood=false;
+	}
+	//向左
+	if(head->right-20==food->right&&head->top==food->top&&head->left-20==food->left&&head->bottom==food->bottom&&direction==3)//蛇向右吃食物
+	{
+		food->next=head;
+		head=food;
+		IsEated=true;
+		IsExistFood=false;
+	}
+	//向上
+	if(head->left==food->left&&head->top+20==food->top&&head->right==food->right&&head->bottom+20==food->bottom&&direction==1)//蛇向右吃食物
+	{
+		food->next=head;
+		head=food;
+		IsEated=true;
+		IsExistFood=false;
+	}
+	//向下
+	if(head->left==food->left&&head->top-20==food->top&&head->right==food->right&&head->bottom-20==food->bottom&&direction==2)//蛇向右吃食物
+	{
+		food->next=head;
+		head=food;
+		IsEated=true;
+		IsExistFood=false;
+	}
+
+
+	if(IsEated)
+	{
+		score++;
+		//绘制新蛇头
+		fillrectangle(p->left,p->top,p->right,p->bottom);//擦除原来的蛇头
+		fillrectangle(p->left,p->top,p->right,p->bottom);//绘制新的蛇头
+		int x=(head->left+head->right)/2;
+		int y=(head->top+head->bottom)/2;
+		setfillcolor(YELLOW);
+		fillcircle(x,y,2);
+
+
+		if(worm!=NULL)
+	{
+		IMAGE green;
+		loadimage(&green,"C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\green.png");
+		putimage(worm->left,worm->top,&green);
+			
+		if(worm!=NULL)
+		{
+			setfillcolor(GREEN);
+			fillrectangle(worm->left,worm->top,worm->right,worm->bottom);
+		}
+			
+			
+     }
+	}
+	
+}
+
+
+int biteself()
+{
+	snake *p;p=head;
+	while(p)
+	{
+		p=p->next;
+		if(p!=NULL&&head->left==p->left&&head->top==p->top&&head->right==p->right&&head->bottom==p->bottom)
+		{
+			endgamestatus=2;
+			return 1;
+		}
+		
+	}
+	return 0;
+}
+
+
+int cantcrosswall()
+{
+	snake *p;p=head;
+	if(p->top==80||p->bottom==580||p->left==0||p->right==600)
+	{
+		endgamestatus=1;
+		return 1;
+	}
+	return 0;
+}
+
+int eateworm()
+{
+	snake *p;p=head;
+	snake *pl;pl=worm;	
+	if(p->top==worm->top&&p->bottom==worm->bottom&&p->left==worm->left&&p->right==worm->right)
+	{
+		endgamestatus=4;
+		return 1;
+	}
+	return endgamestatus;
+} 
+
+void pause()
+{
+	while(1)
+	{
+		Sleep(300);
+		if(GetAsyncKeyState(VK_SPACE))
+		{
+			break;
+		}
+	}
+}
+
+void endgame()
+{
+	ranking1();
+    RECT r={0, 100, 600, 200};
+    RECT r2={0, 200, 600, 300};
+    if(endgamestatus==1)
+    {
+        drawtext(_T("对不起，您撞到墙了。按空格结束游戏。"),&r,DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
+    else if(endgamestatus==2)
+    {
+        drawtext(_T("对不起，您咬到自己了。按空格结束游戏。"),&r ,DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
+    else if(endgamestatus==3)
+    {
+        drawtext(_T("您的游戏已经结束了。。。按空格。"),&r ,DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    }
+	else if(endgamestatus==4)
+	{
+		drawtext(_T("对不起，您吃到毒虫了。按空格结束游戏。"),&r ,DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+	}
+    
+    pause();
+    exit(0);
+}    
+    
+    
+void GameControl()
+    {
+     while(1)
+        {
+            if(GetAsyncKeyState(VK_UP)&&direction!=2 )
+            {
+                direction=UP;
+            }
+            else if(GetAsyncKeyState(VK_DOWN)&&direction!=1 )
+            {
+                direction=DOWN;
+            }
+            else if(GetAsyncKeyState(VK_LEFT)&&direction!=4 )
+            {
+                direction=LEFT;
+            }
+            else if(GetAsyncKeyState(VK_RIGHT)&&direction!=3 )
+            {
+                direction=RIGHT;
+            }
+            else if(GetAsyncKeyState(VK_ESCAPE))
+            {
+                break;
+            }
+            movesnake();
+			if(!IsExistFood)createfood();
+			eatefood();
+			if(biteself()==1||cantcrosswall()==1||eateworm()==1)
+			{
+				endgame();
+			}
+
+
+			char s[]="你的得分";
+        char GetScore[10];
+		char ss[]="最高分！";
+    
+        itoa(score,GetScore,10);
+        outtextxy(10,20,s);
+        outtextxy(80,20,GetScore);
+		outtextxy(630,360,ss);
+		FILE *fp;
+		int i;
+		if((fp=fopen("f:\\rinking.txt","r"))==NULL)
+		{
+			printf("error!");
+			exit(0);
+		}	
+		for(i=0;i<10;i++)
+		{
+			fscanf(fp,"%5s%5d",&rank[i].name,&rank[i].sco);
+		}
+		
+		outtextxy(630,380,rank[0].name);
+		outtextxy(630,400,rank[1].name);
+		outtextxy(630,420,rank[2].name);
+		outtextxy(630,440,rank[3].name);
+		outtextxy(630,460,rank[4].name);
+		outtextxy(630,480,rank[5].name);
+		outtextxy(630,500,rank[6].name);
+		outtextxy(630,520,rank[7].name);
+		outtextxy(630,540,rank[8].name);
+		outtextxy(630,560,rank[9].name);
+		char GetScore0[10];
+		itoa(rank[0].sco,GetScore0,10);
+		outtextxy(660,380,GetScore0);
+		char GetScore1[10];
+		itoa(rank[1].sco,GetScore1,10);
+		outtextxy(660,400,GetScore1);
+		char GetScore2[10];
+		itoa(rank[2].sco,GetScore2,10);
+		outtextxy(660,420,GetScore2);
+		char GetScore3[10];
+		itoa(rank[3].sco,GetScore3,10);
+		outtextxy(660,440,GetScore3);
+		char GetScore4[10];
+		itoa(rank[4].sco,GetScore4,10);
+		outtextxy(660,460,GetScore4);
+		char GetScore5[10];
+		itoa(rank[5].sco,GetScore5,10);
+		outtextxy(660,480,GetScore5);
+		char GetScore6[10];
+		itoa(rank[6].sco,GetScore6,10);
+		outtextxy(660,500,GetScore6);
+		char GetScore7[10];
+		itoa(rank[7].sco,GetScore7,10);
+		outtextxy(660,520,GetScore7);
+		char GetScore8[10];
+		itoa(rank[8].sco,GetScore8,10);
+		outtextxy(660,540,GetScore8);
+		char GetScore9[10];
+		itoa(rank[9].sco,GetScore9,10);
+		outtextxy(660,560,GetScore9);
+
+
+        }
+		
+    }
+    
+    
+    
+void playmusic()
+{
+	mciSendString("open C:\\Users\\lenovo\\Pictures\\贪吃蛇草\\music.mp3 alias BackMusic",NULL, 0, NULL);
+	mciSendString("setaudio BackMusic volume to 300",NULL,0,NULL);
+    mciSendString("play BackMusic repeat",NULL, 0, NULL);
+}
+
+
+void main(int argc,char *argv[])
+{
+	initgraph(800,600);//初始化图形区域像素为800*600
+	InitMap();
+	playmusic();
+	initsnake();
+	GameControl();
+	getch();
+	closegraph();//关闭图形界面
+}
